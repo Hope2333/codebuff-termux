@@ -1,6 +1,6 @@
 # Codebuff for Termux
 
-**Codebuff** — 免费的 AI 编程助手（[Codebuff](https://codebuff.com) 的免费版），适配 Android Termux。
+**Codebuff** — AI 编程助手，适配 Android Termux。
 
 ## 快速开始
 
