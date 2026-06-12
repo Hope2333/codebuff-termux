@@ -35,6 +35,7 @@ echo "Started: $(date)" > "$BUILD_LOG"
 # Clean
 rm -rf "$STAGED"
 mkdir -p "$STAGED/bin"
+mkdir -p "$STAGED/lib/freebuff/runtime"
 mkdir -p "$STAGED/lib/freebuff/patches"
 mkdir -p "$STAGED/lib/freebuff/scripts"
 
@@ -52,7 +53,18 @@ else
     err "freebuff-wrapper.c not found"
 fi
 
-# ── 2. hook.so ──────────────────────────────────────────────────────
+# ── 2. Runtime binary ───────────────────────────────────────────────
+RUNTIME_SRC="${HOME}/.config/manicode/freebuff"
+RUNTIME_OUT="$STAGED/lib/freebuff/runtime/freebuff"
+if [ -f "$RUNTIME_SRC" ]; then
+	cp -a "$RUNTIME_SRC" "$RUNTIME_OUT"
+	chmod 755 "$RUNTIME_OUT"
+	log "  → lib/freebuff/runtime/freebuff ($(du -h "$RUNTIME_OUT" | cut -f1))"
+else
+	err "runtime binary not found at $RUNTIME_SRC (run 'make produce' first)"
+fi
+
+# ── 3. hook.so ──────────────────────────────────────────────────────
 HOOK_SRC="$PROJECT_DIR/tools/hook.c"
 HOOK_OUT="$STAGED/lib/freebuff/hook.so"
 GLIBC_INC="/data/data/com.termux/files/usr/glibc/include"

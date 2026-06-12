@@ -1,0 +1,43 @@
+pkgname=freebuff
+pkgver=0.0.0
+pkgrel=1
+pkgdesc='Freebuff AI coding assistant for Termux'
+arch=('aarch64')
+url='https://github.com/CodebuffAI/codebuff-community'
+license=('MIT')
+options=('!strip' '!debug')
+
+makedepends=()
+source=()
+sha256sums=()
+
+_prefix="${PREFIX:-/data/data/com.termux/files/usr}"
+_repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
+_staged_prefix="${STAGED_PREFIX:-${_repo_root}/artifacts/staged}"
+
+prepare() {
+  [[ -x "${_staged_prefix}/lib/freebuff/runtime/freebuff" ]] || {
+    error "missing runtime at ${_staged_prefix}/lib/freebuff/runtime/freebuff"
+    return 1
+  }
+  [[ -x "${_staged_prefix}/bin/freebuff" ]] || {
+    error "missing launcher at ${_staged_prefix}/bin/freebuff"
+    return 1
+  }
+}
+
+build() { true; }
+
+package() {
+  mkdir -p "$pkgdir${_prefix}"
+  cp -a "${_staged_prefix}/." "$pkgdir${_prefix}/"
+}
+
+post_install() {
+  echo "Freebuff for Termux installed"
+  echo "Run: freebuff --version"
+}
+
+post_upgrade() { true; }
+pre_remove() { true; }
+post_remove() { true; }

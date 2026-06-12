@@ -1,8 +1,14 @@
 *.bin
 *.tar.gz
 *.tgz
+*.deb
+*.pkg.tar.xz
 node_modules/
 .sisyphus/
 artifacts/
 downloads/
+packing/
 npm-test/
+packaging/dpkg/work/
+packaging/pacman/pkg/
+packaging/pacman/src/
