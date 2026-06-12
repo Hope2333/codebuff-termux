@@ -1,9 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #
-# tools/produce-local.sh — Download freebuff binary + build hooks locally
+# tools/produce-local.sh — Download codebuff binary + build hooks locally
 #
 # This is the "produce" step in the produce → stage → install pipeline.
-# It downloads the freebuff binary from GitHub, compiles hook.so and the C
+# It downloads the codebuff binary from GitHub, compiles hook.so and the C
 # wrapper, and places them in tools/ for local testing.
 #
 # Usage:
@@ -12,8 +12,8 @@
 #
 # Output artifacts:
 #   tools/hook.so           — glibc LD_PRELOAD hook
-#   tools/freebuff-wrapper  — Bionic C wrapper (NOT installed)
-#   downloads/freebuff      — unpacked binary
+#   tools/codebuff-wrapper  — Bionic C wrapper (NOT installed)
+#   downloads/codebuff      — unpacked binary
 #
 # Environment:
 #   NO_PATCH=1    skip patchelf + glibc linker fix (faster iteration)
@@ -34,18 +34,18 @@ err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 # ── Config ──────────────────────────────────────────────────────────
 VERSION="${1:-latest}"
 BINARY_DIR="${HOME}/.config/manicode"
-BINARY_PATH="${BINARY_DIR}/freebuff"
+BINARY_PATH="${BINARY_DIR}/codebuff"
 GLIBC_LIB="/data/data/com.termux/files/usr/glibc/lib"
 GLIBC_LD="${GLIBC_LIB}/ld-linux-aarch64.so.1"
 GLIBC_INC="/data/data/com.termux/files/usr/glibc/include"
-BUN_REPO="oven-sh/bun"  # Bun publishes freebuff-compatible linux binaries
-ARCH="aarch64"
+BUN_REPO="oven-sh/bun"  # Bun publishes codebuff-compatible linux binaries
+ARCH="arm64"
 
 # ── Step 1: Determine version ───────────────────────────────────────
 if [ "$VERSION" = "latest" ]; then
-    log "Finding latest freebuff version..."
-    VERSION=$(npm view freebuff version 2>/dev/null || \
-              curl -sL https://registry.npmjs.org/freebuff/latest | \
+    log "Finding latest codebuff version..."
+    VERSION=$(npm view codebuff version 2>/dev/null || \
+              curl -sL https://registry.npmjs.org/codebuff/latest | \
               node -e "process.stdin.resume(); let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>console.log(JSON.parse(d).version))")
     log "Latest: $VERSION"
 fi
@@ -54,41 +54,42 @@ fi
 BUN_VERSION="${VERSION#v}"
 DOWNLOAD_DIR="$PROJECT_DIR/downloads"
 mkdir -p "$DOWNLOAD_DIR"
-TARBALL="$DOWNLOAD_DIR/freebuff-linux-${ARCH}.tar.gz"
-BINARY_IN_TAR="freebuff-linux-${ARCH}/freebuff"
+TARBALL="$DOWNLOAD_DIR/codebuff-linux-${ARCH}.tar.gz"
+BINARY_IN_TAR="codebuff-linux-${ARCH}/codebuff"
 
 if [ ! -f "$BINARY_PATH" ] && [ "${NO_DOWNLOAD:-0}" != "1" ]; then
-    # freebuff releases are on the oven-sh/bun releases page
-    # They follow format: freebuff-v0.0.96  (or just v0.0.96)
-    # Multiple possible URLs:
     URLS=(
-        "https://github.com/CodebuffAI/codebuff-community/releases/download/v${BUN_VERSION}/freebuff-linux-${ARCH}.tar.gz"
-        "https://github.com/CodebuffAI/codebuff/releases/download/v${BUN_VERSION}/freebuff-linux-${ARCH}.tar.gz"
-        "https://github.com/oven-sh/bun/releases/download/freebuff-v${BUN_VERSION}/freebuff-linux-${ARCH}.tar.gz"
+        "https://github.com/CodebuffAI/codebuff-community/releases/download/v${BUN_VERSION}/codebuff-linux-${ARCH}.tar.gz"
+        "https://github.com/CodebuffAI/codebuff/releases/download/v${BUN_VERSION}/codebuff-linux-${ARCH}.tar.gz"
+        "https://github.com/oven-sh/bun/releases/download/codebuff-v${BUN_VERSION}/codebuff-linux-${ARCH}.tar.gz"
     )
 
     DOWNLOADED=0
     for URL in "${URLS[@]}"; do
         log "Trying: $URL"
-        if curl -sL --connect-timeout 10 --max-time 120 -o "$TARBALL" "$URL"; then
-            log "Downloaded ($(du -h "$TARBALL" | cut -f1))"
-            DOWNLOADED=1
-            break
+        if command -v wget >/dev/null 2>&1; then
+            wget -c --timeout=300 "$URL" -O "$TARBALL" 2>&1 && DOWNLOADED=1 && break
+        else
+            curl -fL --connect-timeout 10 --max-time 600 -o "$TARBALL" "$URL" 2>&1 && DOWNLOADED=1 && break
         fi
     done
 
     if [ "$DOWNLOADED" != "1" ]; then
-        err "Failed to download freebuff binary from any URL.
-Either supply the version as argument, or download manually and place at:
-  $BINARY_PATH"
+        err "Failed to download codebuff binary from any URL."
     fi
 
     log "Extracting binary..."
     mkdir -p "$BINARY_DIR"
     tar -xzf "$TARBALL" -C "$DOWNLOAD_DIR"
-    cp "$DOWNLOAD_DIR/$BINARY_IN_TAR" "$BINARY_PATH"
+    # Find the actual binary
+    BIN="$(find "$DOWNLOAD_DIR" -type f \( -name "codebuff" -o -name "codebuff-linux-*" \) ! -name "*.tar.gz" 2>/dev/null | head -1)"
+    if [ -z "$BIN" ]; then
+        BIN="$DOWNLOAD_DIR/$BINARY_IN_TAR"
+    fi
+    [ -f "$BIN" ] || BIN="$(find "$DOWNLOAD_DIR" -type f -executable 2>/dev/null | head -1)"
+    cp "$BIN" "$BINARY_PATH"
     chmod +x "$BINARY_PATH"
-    log "Binary installed: $BINARY_PATH"
+    log "Binary installed: $BINARY_PATH ($(du -h "$BINARY_PATH" | cut -f1))"
 else
     if [ -f "$BINARY_PATH" ]; then
         log "Binary already present: $BINARY_PATH ($(du -h "$BINARY_PATH" | cut -f1))"
@@ -151,14 +152,14 @@ if [ "${NO_BUILD:-0}" != "1" ]; then
     fi
 
     # Build C wrapper (Bionic)
-    WRAPPER_SRC="$PROJECT_DIR/scripts/freebuff-wrapper.c"
-    WRAPPER_OUT="$SCRIPT_DIR/freebuff-wrapper"
+    WRAPPER_SRC="$PROJECT_DIR/scripts/codebuff-wrapper.c"
+    WRAPPER_OUT="$SCRIPT_DIR/codebuff-wrapper"
     if [ -f "$WRAPPER_SRC" ]; then
-        log "Compiling freebuff-wrapper (Bionic)..."
+        log "Compiling codebuff-wrapper (Bionic)..."
         if gcc -O2 -s -o "$WRAPPER_OUT" "$WRAPPER_SRC" 2>&1; then
-            log "freebuff-wrapper compiled ($(du -h "$WRAPPER_OUT" | cut -f1))"
+            log "codebuff-wrapper compiled ($(du -h "$WRAPPER_OUT" | cut -f1))"
         else
-            warn "freebuff-wrapper compilation failed"
+            warn "codebuff-wrapper compilation failed"
         fi
     fi
 else
@@ -172,8 +173,8 @@ log "  produce-local.sh complete!"
 log ""
 log "  Binary:   $BINARY_PATH"
 log "  hook.so:  $HOOK_SRC → $SCRIPT_DIR/hook.so"
-log "  Wrapper:  $WRAPPER_SRC → $SCRIPT_DIR/freebuff-wrapper"
+log "  Wrapper:  $WRAPPER_SRC → $SCRIPT_DIR/codebuff-wrapper"
 log ""
-log "  Test:     timeout 10 tools/freebuff-wrapper --version"
+log "  Test:     timeout 10 tools/codebuff-wrapper --version"
 log "  Install:  make install"
 log "═══════════════════════════════════════════"

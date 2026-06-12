@@ -1,7 +1,7 @@
-pkgname=freebuff
+pkgname=codebuff
 pkgver=0.0.0
 pkgrel=1
-pkgdesc='Freebuff AI coding assistant for Termux'
+pkgdesc='Codebuff AI coding assistant for Termux'
 arch=('aarch64')
 url='https://github.com/CodebuffAI/codebuff-community'
 license=('MIT')
@@ -16,12 +16,12 @@ _repo_root="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 _staged_prefix="${STAGED_PREFIX:-${_repo_root}/artifacts/staged}"
 
 prepare() {
-  [[ -x "${_staged_prefix}/lib/freebuff/runtime/freebuff" ]] || {
-    error "missing runtime at ${_staged_prefix}/lib/freebuff/runtime/freebuff"
+  [[ -x "${_staged_prefix}/lib/codebuff/runtime/codebuff" ]] || {
+    error "missing runtime at ${_staged_prefix}/lib/codebuff/runtime/codebuff"
     return 1
   }
-  [[ -x "${_staged_prefix}/bin/freebuff" ]] || {
-    error "missing launcher at ${_staged_prefix}/bin/freebuff"
+  [[ -x "${_staged_prefix}/bin/codebuff" ]] || {
+    error "missing launcher at ${_staged_prefix}/bin/codebuff"
     return 1
   }
 }
@@ -34,8 +34,8 @@ package() {
 }
 
 post_install() {
-  echo "Freebuff for Termux installed"
-  echo "Run: freebuff --version"
+  echo "Codebuff for Termux installed"
+  echo "Run: codebuff --version"
 }
 
 post_upgrade() { true; }

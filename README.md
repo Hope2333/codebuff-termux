@@ -1,6 +1,6 @@
-# Freebuff for Termux
+# Codebuff for Termux
 
-**Freebuff** — 免费的 AI 编程助手（[Codebuff](https://codebuff.com) 的免费版），适配 Android Termux。
+**Codebuff** — 免费的 AI 编程助手（[Codebuff](https://codebuff.com) 的免费版），适配 Android Termux。
 
 ## 快速开始
 
@@ -9,11 +9,11 @@
 apt install -y glibc-repo && apt update && apt install -y glibc openssl-glibc patchelf
 pkg install proot gcc nodejs
 
-# 2. 安装 freebuff（patch npm 包 + binary + C wrapper）
+# 2. 安装 codebuff（patch npm 包 + binary + C wrapper）
 bash scripts/install.sh
 
 # 3. 运行——无需 shell rc 配置
-freebuff --version
+codebuff --version
 ```
 
 首次运行 `install.sh` 会从 GitHub Releases 自动下载约 129MB 的二进制文件（若网络慢等待即可）。
@@ -21,9 +21,9 @@ freebuff --version
 ## 架构概览
 
 ```
-终端                          freebuff-termux
+终端                          codebuff-termux
   │
-  ├── /usr/bin/freebuff
+  ├── /usr/bin/codebuff
   │     └─ C 包装器（Bionic 编译，原生 Termux ELF，~5KB）
   │          ├─ unsetenv(LD_LIBRARY_PATH) 等
   │          ├─ 创建假 /proc/stat（绕过 Android 11+ 内核限制）
@@ -32,7 +32,7 @@ freebuff --version
   │                ├─ [proot] ptrace 级路径重定向
   │                │    └─ /proc/stat 读取 → fake_stat 内容
   │                │
-  │                └─ ~/.config/manicode/freebuff
+  │                └─ ~/.config/manicode/codebuff
   │                     └─ 原始 binary（patchelf 改 interpreter）
   │                          └─ glibc ld.so（自动加载 libc.so.6 等）
   │
@@ -51,7 +51,7 @@ freebuff --version
 
 | 步骤 | 状态 | 说明 |
 |------|------|------|
-| npm 安装（patch os 字段） | ✅ **通过** | `npm install -g freebuff` 成功 |
+| npm 安装（patch os 字段） | ✅ **通过** | `npm install -g codebuff` 成功 |
 | `android-arm64` 平台映射 | ✅ **通过** | JS 包装器能正确下载 linux-arm64 binary |
 | Binary 下载 | ✅ **通过** | GitHub Releases ~124MB |
 | glibc 兼容性 | ✅ **通过** | patchelf 改 interpreter → 直接执行 |
@@ -74,7 +74,7 @@ freebuff --version
 
 `index.js` 的 `PLATFORM_TARGETS` 没有 `android-arm64`。
 
-**方案**：添加映射 `android-arm64 → freebuff-linux-arm64.tar.gz`（`patches/0002-add-android-platform-mapping.patch`）。
+**方案**：添加映射 `android-arm64 → codebuff-linux-arm64.tar.gz`（`patches/0002-add-android-platform-mapping.patch`）。
 
 ### 问题 3：glibc 兼容性（Binary 运行）
 
@@ -83,7 +83,7 @@ freebuff --version
 **方案**：`patchelf --set-interpreter` 将 interpreter 改为 glibc ld.so：
 ```bash
 patchelf --set-interpreter /data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 \
-  ~/.config/manicode/freebuff
+  ~/.config/manicode/codebuff
 ```
 binary 直接运行时内核自动调用 glibc ld.so，不再需要 `--library-path` 参数。
 
@@ -113,7 +113,7 @@ cpu0 0 0 0 0 0 0 0 0 0 0
 ..." > /tmp/fake_stat
 
 # proot bind mount
-proot -b /tmp/fake_stat:/proc/stat freebuff
+proot -b /tmp/fake_stat:/proc/stat codebuff
 ```
 
 C 包装器自动检测 proot 可用性并执行上述操作。无 proot 时 fallback 到直接执行（os.cpus() 会崩溃）。
@@ -122,15 +122,15 @@ C 包装器自动检测 proot 可用性并执行上述操作。无 proot 时 fal
 
 Android 的 SELinux 策略限制非特权进程读取 `/data/` 目录内容。某些 Bun 版本在启动时扫描父目录时可能触发 `CouldntReadCurrentDirectory`。
 
-**方案**：此问题在 freebuff 特定版本中影响有限。C 包装器通过 proot 可能缓解该问题。
+**方案**：此问题在 codebuff 特定版本中影响有限。C 包装器通过 proot 可能缓解该问题。
 
 ## 项目结构
 
 ```
-freebuff-termux/
+codebuff-termux/
 ├── scripts/
 │   ├── install.sh                # 全自动安装脚本
-│   └── freebuff-wrapper.c        # C 包装器源码（75 行）
+│   └── codebuff-wrapper.c        # C 包装器源码（75 行）
 ├── patches/
 │   ├── 0001-add-android-os-support.patch
 │   └── 0002-add-android-platform-mapping.patch
@@ -141,7 +141,7 @@ freebuff-termux/
 ### `scripts/install.sh`
 全自动完成：
 1. 查询 npm registry 获取最新版本
-2. `npm pack` 下载 freebuff 包
+2. `npm pack` 下载 codebuff 包
 3. 修改 `package.json` → 添加 `android` 到 os
 4. 修改 `index.js` → 添加 `android-arm64` 映射
 5. `termux-fix-shebang` → shebang 修复
@@ -150,9 +150,9 @@ freebuff-termux/
 8. 触发 binary 下载（GitHub Releases ~129MB）
 9. `patchelf` → 修改 interpreter 为 glibc ld.so
 10. 修复 glibc lib 链接脚本（`.so` → symlink）
-11. 编译 C 包装器，安装为 `/usr/bin/freebuff`
+11. 编译 C 包装器，安装为 `/usr/bin/codebuff`
 
-### `scripts/freebuff-wrapper.c`
+### `scripts/codebuff-wrapper.c`
 Bionic 编译的 C 包装器 (~5KB)，逻辑：
 - `unsetenv()` 清除 `LD_LIBRARY_PATH`、`LD_PRELOAD` 等
 - 检测 proot 可用性，创建假 `/proc/stat`，执行 `proot -b` 绑定
@@ -173,7 +173,7 @@ Bionic 编译的 C 包装器 (~5KB)，逻辑：
 
 ## 已知限制
 
-1. **自动更新**：freebuff 自动更新需 JS 包装器的 spawn 路径（C 包装器暂不处理更新，需手动重装）
+1. **自动更新**：codebuff 自动更新需 JS 包装器的 spawn 路径（C 包装器暂不处理更新，需手动重装）
 2. **proot 依赖**：无 proot 时 CLI 会因 `os.cpus()` 崩溃（`--version` 不受影响）
 3. **glibc 依赖**：需要额外安装 glibc + openssl-glibc
 4. **网络要求**：首次下载 ~124MB
@@ -181,7 +181,7 @@ Bionic 编译的 C 包装器 (~5KB)，逻辑：
 
 ## 链接
 
-- [Freebuff on npm](https://www.npmjs.com/package/freebuff)
+- [Codebuff on npm](https://www.npmjs.com/package/codebuff)
 - [Codebuff GitHub](https://github.com/CodebuffAI/codebuff)
 - [Codebuff Community Releases](https://github.com/CodebuffAI/codebuff-community/releases)
 - [opencode-termux](https://github.com/Hope2333/opencode-termux)

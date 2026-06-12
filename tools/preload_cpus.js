@@ -1,4 +1,4 @@
-// Override os.cpus() before freebuff loads
+// Override os.cpus() before codebuff loads
 import os from 'node:os';
 const _orig = os.cpus.bind(os);
 os.cpus = function patchedCpus() {

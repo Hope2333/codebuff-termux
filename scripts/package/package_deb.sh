@@ -8,12 +8,12 @@ ARCH_DEB="${ARCH_DEB:-$(dpkg --print-architecture 2>/dev/null || echo aarch64)}"
 MAINTAINER="${MAINTAINER:-Hope2333(幽零小喵) <u0catmiao@proton.me>}"
 
 command -v dpkg-deb >/dev/null 2>&1 || { echo "Error: dpkg-deb not found"; exit 1; }
-[[ -x "$STAGED_PREFIX/bin/freebuff" ]] || { echo "Error: missing staged launcher"; exit 1; }
+[[ -x "$STAGED_PREFIX/bin/codebuff" ]] || { echo "Error: missing staged launcher"; exit 1; }
 
 : "${VERSION:=0.0.0}"
 DEB_ROOT="$ROOT_DIR/packaging/dpkg/work"
 OUT_DIR="$ROOT_DIR/packaging/dpkg"
-OUT_FILE="$OUT_DIR/freebuff_${VERSION}_${ARCH_DEB}.deb"
+OUT_FILE="$OUT_DIR/codebuff_${VERSION}_${ARCH_DEB}.deb"
 
 rm -rf "$DEB_ROOT"
 mkdir -p "$DEB_ROOT/DEBIAN" "$DEB_ROOT$PREFIX" "$OUT_DIR"
@@ -21,13 +21,13 @@ chmod 755 "$DEB_ROOT" "$DEB_ROOT/DEBIAN"
 cp -a "$STAGED_PREFIX/." "$DEB_ROOT$PREFIX/"
 
 cat >"$DEB_ROOT/DEBIAN/control" <<EOF
-Package: freebuff
+Package: codebuff
 Version: $VERSION
 Architecture: $ARCH_DEB
 Maintainer: $MAINTAINER
 Section: utils
 Priority: optional
-Description: Freebuff AI coding assistant for Termux
+Description: Codebuff AI coding assistant for Termux
 Depends: bash, glibc, openssl-glibc
 EOF
 
@@ -37,8 +37,8 @@ echo "Installed-Size: $INSTALLED_SIZE" >>"$DEB_ROOT/DEBIAN/control"
 cat >"$DEB_ROOT/DEBIAN/postinst" <<'POSTINST'
 #!/data/data/com.termux/files/usr/bin/bash
 set -e
-echo "Freebuff for Termux installed"
-echo "Run: freebuff --version"
+echo "Codebuff for Termux installed"
+echo "Run: codebuff --version"
 exit 0
 POSTINST
 chmod 755 "$DEB_ROOT/DEBIAN/postinst"

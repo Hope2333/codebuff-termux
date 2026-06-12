@@ -6,19 +6,19 @@ STAGED_PREFIX="${STAGED_PREFIX:-$ROOT_DIR/artifacts/staged}"
 PACKAGER_NAME="${PACKAGER_NAME:-Hope2333(幽零小喵) <u0catmiao@proton.me>}"
 PKGREL="${PKGREL:-1}"
 
-[[ -x "$STAGED_PREFIX/lib/freebuff/runtime/freebuff" ]] || { echo "Error: missing runtime"; exit 1; }
-[[ -x "$STAGED_PREFIX/bin/freebuff" ]] || { echo "Error: missing staged launcher"; exit 1; }
+[[ -x "$STAGED_PREFIX/lib/codebuff/runtime/codebuff" ]] || { echo "Error: missing runtime"; exit 1; }
+[[ -x "$STAGED_PREFIX/bin/codebuff" ]] || { echo "Error: missing staged launcher"; exit 1; }
 
-if [[ -z "${VERSION:-}" && -x "$STAGED_PREFIX/lib/freebuff/runtime/freebuff" ]]; then
-	VERSION="$($STAGED_PREFIX/lib/freebuff/runtime/freebuff --version 2>/dev/null || true)"
+if [[ -z "${VERSION:-}" && -x "$STAGED_PREFIX/lib/codebuff/runtime/codebuff" ]]; then
+	VERSION="$($STAGED_PREFIX/lib/codebuff/runtime/codebuff --version 2>/dev/null || true)"
 fi
 [[ -n "$VERSION" ]] || { echo "Error: unable to determine version"; exit 1; }
 
 cd "$ROOT_DIR/packaging/pacman"
 rm -rf "$ROOT_DIR/packaging/pacman/pkg" "$ROOT_DIR/packaging/pacman/src"
 
-TMP_MAKEPKG_CONF="$ROOT_DIR/packaging/pacman/.makepkg-freebuff.conf"
-TMP_PKGBUILD="$ROOT_DIR/packaging/pacman/.PKGBUILD.freebuff.tmp"
+TMP_MAKEPKG_CONF="$ROOT_DIR/packaging/pacman/.makepkg-codebuff.conf"
+TMP_PKGBUILD="$ROOT_DIR/packaging/pacman/.PKGBUILD.codebuff.tmp"
 cleanup() { rm -f "$TMP_MAKEPKG_CONF" "$TMP_PKGBUILD"; }
 trap cleanup EXIT
 

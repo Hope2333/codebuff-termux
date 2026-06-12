@@ -1,26 +1,26 @@
 /**
- * freebuff-wrapper.c — Freebuff for Termux launcher
+ * codebuff-wrapper.c — Codebuff for Termux launcher
  *
  * Bionic-compiled C wrapper (~5KB ELF) that:
  *   1. Cleans LD_* environment variables to prevent glibc ld.so pollution
  *   2. Detects proot(1) availability, sets up path redirections for /proc/stat
  *   3. LD_PRELOADs hook.so for supplementary glibc function interception
- *   4. Execs the freebuff binary (either under proot or directly)
+ *   4. Execs the codebuff binary (either under proot or directly)
  *
  * This wrapper does NOT depend on bash, zsh, node, or any rc files.
  * It uses only basic C runtime + standard POSIX syscalls.
  *
  * Build:
- *   gcc -O2 -s -o freebuff-wrapper freebuff-wrapper.c
+ *   gcc -O2 -s -o codebuff-wrapper codebuff-wrapper.c
  *
  * Install:
- *   install -m 755 freebuff-wrapper /usr/bin/freebuff
+ *   install -m 755 codebuff-wrapper /usr/bin/codebuff
  *
  * The wrapper locates hook.so and the binary relative to its own
  * installation path:
- *   <prefix>/bin/freebuff         ← this wrapper
- *   <prefix>/lib/freebuff/hook.so ← LD_PRELOAD hook
- *   The freebuff binary path is configured at compile time or
+ *   <prefix>/bin/codebuff         ← this wrapper
+ *   <prefix>/lib/codebuff/hook.so ← LD_PRELOAD hook
+ *   The codebuff binary path is configured at compile time or
  *   discovered via the installed npm package.
  */
 #define _GNU_SOURCE
@@ -34,13 +34,13 @@
 #include <errno.h>
 
 /* ── Default paths (overridable at build with -D) ─────────────────── */
-#ifndef FREEBUFF_BINARY
-#  define FREEBUFF_BINARY \
-    "/data/data/com.termux/files/home/.config/manicode/freebuff"
+#ifndef CODEBUFF_BINARY
+#  define CODEBUFF_BINARY \
+    "/data/data/com.termux/files/home/.config/manicode/codebuff"
 #endif
 #ifndef HOOK_SO
 #  define HOOK_SO \
-    "/data/data/com.termux/files/home/develop/freebuff-termux/tools/hook.so"
+    "/data/data/com.termux/files/home/develop/codebuff-termux/tools/hook.so"
 #endif
 #ifndef PROOT_PATH
 #  define PROOT_PATH \
@@ -48,7 +48,7 @@
 #endif
 #ifndef FAKE_STAT_PATH
 #  define FAKE_STAT_PATH \
-    "/data/data/com.termux/files/usr/tmp/.freebuff-proc-stat"
+    "/data/data/com.termux/files/usr/tmp/.codebuff-proc-stat"
 #endif
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
@@ -146,13 +146,13 @@ int main(int argc, char *argv[], char *envp[]) {
 
     /* 4. Check hook.so and binary availability */
     int has_hook = exists(HOOK_SO, R_OK);
-    int has_binary = exists(FREEBUFF_BINARY, X_OK);
+    int has_binary = exists(CODEBUFF_BINARY, X_OK);
 
     if (!has_binary) {
-        fprintf(stderr, "freebuff-wrapper: binary not found at %s\n"
-                "Run 'freebuff --version' to trigger download, or\n"
+        fprintf(stderr, "codebuff-wrapper: binary not found at %s\n"
+                "Run 'codebuff --version' to trigger download, or\n"
                 "reinstall via: bash <(curl -sL https://...) install.sh\n",
-                FREEBUFF_BINARY);
+                CODEBUFF_BINARY);
         return 1;
     }
 
@@ -179,7 +179,7 @@ int main(int argc, char *argv[], char *envp[]) {
     }
 
     /* 7. Append binary + original args (skip --no-proot) */
-    cmd->argv[cmd->len++] = (char *)FREEBUFF_BINARY;
+    cmd->argv[cmd->len++] = (char *)CODEBUFF_BINARY;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-proot") != 0)
             cmd->argv[cmd->len++] = argv[i];
@@ -191,13 +191,13 @@ int main(int argc, char *argv[], char *envp[]) {
 
     /* 9. Fallback: exec without proot */
     if (has_proot) {
-        fprintf(stderr, "freebuff-wrapper: proot exec failed (%m), "
+        fprintf(stderr, "codebuff-wrapper: proot exec failed (%m), "
                 "falling back to direct exec\n");
     }
 
     /* Build direct execve call */
     char **fb = malloc((user_argc + 1) * sizeof(char *));
-    fb[0] = (char *)FREEBUFF_BINARY;
+    fb[0] = (char *)CODEBUFF_BINARY;
     int fi = 1;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-proot") != 0)
@@ -205,8 +205,8 @@ int main(int argc, char *argv[], char *envp[]) {
     }
     fb[fi] = NULL;
 
-    execve(FREEBUFF_BINARY, fb, environ);
-    fprintf(stderr, "freebuff-wrapper: execve %s failed: %m\n",
-            FREEBUFF_BINARY);
+    execve(CODEBUFF_BINARY, fb, environ);
+    fprintf(stderr, "codebuff-wrapper: execve %s failed: %m\n",
+            CODEBUFF_BINARY);
     return 1;
 }

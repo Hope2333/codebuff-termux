@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/make
-# Freebuff for Termux — build system
+# Codebuff for Termux — build system
 SHELL := /data/data/com.termux/files/usr/bin/bash
 .DEFAULT_GOAL := help
 
@@ -11,18 +11,18 @@ STAGED      := $(ARTIFACTS)/staged
 
 HOOK_SRC    := $(TOOLS_DIR)/hook.c
 HOOK_OUT    := $(TOOLS_DIR)/hook.so
-WRAPPER_SRC := $(SCRIPTS_DIR)/freebuff-wrapper.c
-WRAPPER_OUT := $(SCRIPTS_DIR)/freebuff-wrapper
+WRAPPER_SRC := $(SCRIPTS_DIR)/codebuff-wrapper.c
+WRAPPER_OUT := $(SCRIPTS_DIR)/codebuff-wrapper
 
 BINARY_DIR  := $(HOME)/.config/manicode
-BINARY_PATH := $(BINARY_DIR)/freebuff
+BINARY_PATH := $(BINARY_DIR)/codebuff
 
 GLIBC_INC   := /data/data/com.termux/files/usr/glibc/include
 GLIBC_LIB   := /data/data/com.termux/files/usr/glibc/lib
 
 # Release upload target variables
 TAG ?= Push$(shell date +%y%m%d)
-REPO ?= Hope2333/freebuff-termux
+REPO ?= Hope2333/codebuff-termux
 VER ?= latest
 VERS ?=
 PKG ?= both
@@ -35,7 +35,7 @@ OUTPUT_ROOT := $(if $(ODIR),$(ODIR),$(PROJECT_DIR)/packing)
 .PHONY: help all deb pacman batch release-upload version deps produce stage install test clean dev
 
 help:
-	@echo "Freebuff for Termux — build system"
+	@echo "Codebuff for Termux — build system"
 	@echo ""
 	@echo "Primary commands:"
 	@echo "  make all VER=0.0.106 PKG=both"
@@ -73,7 +73,7 @@ batch:
 
 # ═══════════════════════════════════════════════════════════════════
 version:
-	@echo "Freebuff Termux"
+	@echo "Codebuff Termux"
 	@echo "  Project: $(PROJECT_DIR)"
 	@echo "  Binary:  $(BINARY_PATH)"
 	@-test -f "$(BINARY_PATH)" && echo "  Version: $$(timeout 5 $(BINARY_PATH) --version 2>/dev/null || echo '(unknown)')" || true
@@ -102,29 +102,29 @@ deb:
 	rm -rf packaging/dpkg/work
 	MAINTAINER='$(PACKAGER_NAME)' ./scripts/package/package_deb.sh
 	@if [ "$(MIX)" = "1" ]; then \
-		mkdir -p "$(OUTPUT_ROOT)" && cp -f packaging/dpkg/freebuff_*.deb "$(OUTPUT_ROOT)/" 2>/dev/null || true; \
+		mkdir -p "$(OUTPUT_ROOT)" && cp -f packaging/dpkg/codebuff_*.deb "$(OUTPUT_ROOT)/" 2>/dev/null || true; \
 	else \
-		mkdir -p "$(OUTPUT_ROOT)/deb" && cp -f packaging/dpkg/freebuff_*.deb "$(OUTPUT_ROOT)/deb/" 2>/dev/null || true; \
+		mkdir -p "$(OUTPUT_ROOT)/deb" && cp -f packaging/dpkg/codebuff_*.deb "$(OUTPUT_ROOT)/deb/" 2>/dev/null || true; \
 	fi
 
 pacman:
 	rm -rf packaging/pacman/pkg packaging/pacman/src
 	PACKAGER_NAME='$(PACKAGER_NAME)' ./scripts/package/package_pacman.sh
 	@if [ "$(MIX)" = "1" ]; then \
-		mkdir -p "$(OUTPUT_ROOT)" && cp -f packaging/pacman/freebuff-*.pkg.* "$(OUTPUT_ROOT)/" 2>/dev/null || true; \
+		mkdir -p "$(OUTPUT_ROOT)" && cp -f packaging/pacman/codebuff-*.pkg.* "$(OUTPUT_ROOT)/" 2>/dev/null || true; \
 	else \
-		mkdir -p "$(OUTPUT_ROOT)/pacman" && cp -f packaging/pacman/freebuff-*.pkg.* "$(OUTPUT_ROOT)/pacman/" 2>/dev/null || true; \
+		mkdir -p "$(OUTPUT_ROOT)/pacman" && cp -f packaging/pacman/codebuff-*.pkg.* "$(OUTPUT_ROOT)/pacman/" 2>/dev/null || true; \
 	fi
 
 # ═══════════════════════════════════════════════════════════════════
 install: stage
 	@echo "=== Install ==="
-	install -m 755 "$(STAGED)/bin/freebuff" "/data/data/com.termux/files/usr/bin/freebuff"
-	@mkdir -p "/data/data/com.termux/files/usr/lib/freebuff/runtime"
-	install -m 755 "$(STAGED)/lib/freebuff/runtime/freebuff" "/data/data/com.termux/files/usr/lib/freebuff/runtime/freebuff"
-	install -m 644 "$(STAGED)/lib/freebuff/hook.so" "/data/data/com.termux/files/usr/lib/freebuff/hook.so" 2>/dev/null || true
+	install -m 755 "$(STAGED)/bin/codebuff" "/data/data/com.termux/files/usr/bin/codebuff"
+	@mkdir -p "/data/data/com.termux/files/usr/lib/codebuff/runtime"
+	install -m 755 "$(STAGED)/lib/codebuff/runtime/codebuff" "/data/data/com.termux/files/usr/lib/codebuff/runtime/codebuff"
+	install -m 644 "$(STAGED)/lib/codebuff/hook.so" "/data/data/com.termux/files/usr/lib/codebuff/hook.so" 2>/dev/null || true
 	@echo ""
-	@echo "[✓] Installed! Run: freebuff"
+	@echo "[✓] Installed! Run: codebuff"
 
 test:
 	@echo "=== Test ==="
@@ -154,7 +154,7 @@ release-upload:
 		echo "Creating release $(TAG)..."; \
 		gh release create "$(TAG)" --repo "$(REPO)" --title "$(TAG)" --notes "Automated build $$(date -u +%Y-%m-%d)" 2>&1 || exit 1; \
 	fi; \
-	for f in /tmp/fb-release-$(TAG)/freebuff_*.deb /tmp/fb-release-$(TAG)/freebuff-*.pkg.*; do \
+	for f in /tmp/fb-release-$(TAG)/codebuff_*.deb /tmp/fb-release-$(TAG)/codebuff-*.pkg.*; do \
 		if [ -f "$$f" ]; then \
 			echo "  uploading $$(basename $$f)..."; \
 			gh release upload "$(TAG)" "$$f" --repo "$(REPO)" --clobber 2>&1 || true; \

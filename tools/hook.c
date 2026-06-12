@@ -1,5 +1,5 @@
 /**
- * hook.c — glibc LD_PRELOAD hook for running Freebuff on Android without proot
+ * hook.c — glibc LD_PRELOAD hook for running Codebuff on Android without proot
  *
  * Compile against glibc (not Bionic) so glibc's ld.so can load it:
  *   gcc -fPIC -shared -o hook.so hook.c \
@@ -179,7 +179,7 @@ static void ensure_fake_files(void) {
     f = fopen(TMPDIR "/.fb-self-status", "w");
     if (f) {
         fprintf(f,
-            "Name:\tfreebuff\n"
+            "Name:\tcodebuff\n"
             "State:\tR (running)\n"
             "Tgid:\t1\n"
             "Pid:\t1\n"

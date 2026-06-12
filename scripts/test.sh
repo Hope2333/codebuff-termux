@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 #
-# scripts/test.sh — End-to-end tests for freebuff-termux
+# scripts/test.sh — End-to-end tests for codebuff-termux
 #
 # Tests:
 #   1. Binary exists and is executable
@@ -44,15 +44,15 @@ run_test() {
 }
 
 # ── Config ──────────────────────────────────────────────────────────
-BINARY="/data/data/com.termux/files/home/.config/manicode/freebuff"
+BINARY="/data/data/com.termux/files/home/.config/manicode/codebuff"
 HOOK="$PROJECT_DIR/tools/hook.so"
-WRAPPER="$PROJECT_DIR/scripts/freebuff-wrapper"
-WRAPPER_C="$PROJECT_DIR/scripts/freebuff-wrapper.c"
+WRAPPER="$PROJECT_DIR/scripts/codebuff-wrapper"
+WRAPPER_C="$PROJECT_DIR/scripts/codebuff-wrapper.c"
 GLIBC_LD="/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
 QUICK_MODE="${1:-full}"
 
 # ═══════════════════════════════════════════════════════════════════
-echo "=== Freebuff Termux End-to-End Test ==="
+echo "=== Codebuff Termux End-to-End Test ==="
 echo "Started: $(date)"
 echo "Mode: $QUICK_MODE"
 echo ""
@@ -165,9 +165,9 @@ echo "--- 7. Staged artifacts ---"
 
 STAGED="$PROJECT_DIR/artifacts/staged"
 if [ -d "$STAGED" ]; then
-    run_test "staged bin/freebuff" test -f "$STAGED/bin/freebuff"
-    run_test "staged lib/freebuff/hook.so" test -f "$STAGED/lib/freebuff/hook.so"
-    run_test "staged install.sh" test -f "$STAGED/lib/freebuff/install.sh"
+    run_test "staged bin/codebuff" test -f "$STAGED/bin/codebuff"
+    run_test "staged lib/codebuff/hook.so" test -f "$STAGED/lib/codebuff/hook.so"
+    run_test "staged install.sh" test -f "$STAGED/lib/codebuff/install.sh"
 else
     skip "staged directory not present (run 'make stage' first)"
 fi
