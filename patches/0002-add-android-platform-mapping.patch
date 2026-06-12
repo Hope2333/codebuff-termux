@@ -1,0 +1,21 @@
+From: Freebuff-Termux maintainer
+Date: Tue May 26 2026
+Subject: [PATCH 2/2] Add android-arm64 platform mapping
+
+On Termux, process.platform returns "android". The PLATFORM_TARGETS
+map in index.js doesn't have an android entry, causing the download
+to fail with "Unsupported platform".
+
+This patch maps android-arm64 to the linux-arm64 binary, since they
+are the same architecture and the binary works with glibc on Termux.
+
+diff --git a/index.js b/index.js
+index b47a3a2..c8e1f4f 100644
+--- a/index.js
++++ b/index.js
+@@ -12,6 +12,7 @@ const PLATFORM_TARGETS = {
+   'darwin-x64': `${packageName}-darwin-x64.tar.gz`,
+   'darwin-arm64': `${packageName}-darwin-arm64.tar.gz`,
+   'win32-x64': `${packageName}-win32-x64.tar.gz`,
++  'android-arm64': `${packageName}-linux-arm64.tar.gz`,  // Termux
+ };

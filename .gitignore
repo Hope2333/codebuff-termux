@@ -1,0 +1,8 @@
+*.bin
+*.tar.gz
+*.tgz
+node_modules/
+.sisyphus/
+artifacts/
+downloads/
+npm-test/

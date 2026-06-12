@@ -1,0 +1,22 @@
+From: Freebuff-Termux maintainer
+Date: Tue May 26 2026
+Subject: [PATCH 1/2] Add android to supported OS list
+
+The Termux environment reports process.platform as "android", which
+npm rejects when installing freebuff. This patch adds "android" to
+the allowed OS list in package.json.
+
+diff --git a/package.json b/package.json
+index 5d97e6b..a2f1c5c 100644
+--- a/package.json
++++ b/package.json
+@@ -5,7 +5,7 @@
+   "os": [
+     "darwin",
+     "linux",
+-    "win32"
++    "win32",
++    "android"
+   ],
+   "cpu": [
+     "x64",
