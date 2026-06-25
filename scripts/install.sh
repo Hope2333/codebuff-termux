@@ -181,7 +181,24 @@ if [ -d "$GLIBC_LIB" ]; then
   done
 fi
 
-# ---- Step 11: Compile and install C wrapper ----
+# ---- Step 11: Pre-download tree-sitter.wasm ----
+TREESITTER_URL="https://unpkg.com/web-tree-sitter@0.25.10/tree-sitter.wasm"
+TREESITTER_DEST="/data/data/com.termux/files/usr/lib/codebuff/runtime/tree-sitter.wasm"
+if [ ! -f "$TREESITTER_DEST" ]; then
+  log "Downloading tree-sitter.wasm (syntax highlighting)..."
+  mkdir -p "$(dirname "$TREESITTER_DEST")"
+  if command -v curl >/dev/null; then
+    curl -L -s -o "$TREESITTER_DEST" "$TREESITTER_URL" && log "  tree-sitter.wasm saved" || warn "  download failed (codebuff will retry at runtime)"
+  elif command -v wget >/dev/null; then
+    wget -q -O "$TREESITTER_DEST" "$TREESITTER_URL" && log "  tree-sitter.wasm saved" || warn "  download failed (codebuff will retry at runtime)"
+  else
+    warn "  neither curl nor wget available; codebuff will download at runtime via fetch()"
+  fi
+else
+  log "tree-sitter.wasm already present"
+fi
+
+# ---- Step 12: Compile and install C wrapper ----
 if command -v gcc >/dev/null; then
   WRAPPER_SRC="$SCRIPT_DIR/codebuff-wrapper.c"
   WRAPPER_OUT="$SCRIPT_DIR/codebuff-wrapper"
