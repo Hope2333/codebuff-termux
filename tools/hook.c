@@ -16,6 +16,7 @@
  */
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -374,14 +375,47 @@ pid_t fork(void) {
     return pid;
 }
 
-/* ── execve() — log what commands are spawned ── */
+/* ── Helper: copy envp array filtering out LD_PRELOAD ── */
+static char **filter_envp(char *const envp[]) {
+    if (!envp) return NULL;
+    int count = 0;
+    while (envp[count]) count++;
+    char **new_env = malloc((count + 1) * sizeof(char *));
+    if (!new_env) return (char **)envp;
+    int j = 0;
+    for (int i = 0; i < count; i++) {
+        if (strncmp(envp[i], "LD_PRELOAD=", 11) == 0)
+            continue; /* skip — prevents bionic children from crashing */
+        new_env[j++] = envp[i];
+    }
+    new_env[j] = NULL;
+    return new_env;
+}
+
+/* ── execve() — strip LD_PRELOAD for child processes ── */
 int execve(const char *pathname, char *const argv[], char *const envp[]) {
     static int (*real_execve)(const char *, char *const *, char *const *) = NULL;
     if (!real_execve) real_execve = dlsym(RTLD_NEXT, "execve");
-    write(2, "[hook.so] execve: ", 19);
-    write(2, pathname, strlen(pathname));
-    write(2, "\n", 1);
-    return real_execve(pathname, argv, envp);
+    char **clean_env = filter_envp(envp);
+    return real_execve(pathname, argv, (char *const *)clean_env);
+}
+
+/* ── execvp() — strip LD_PRELOAD from environ before exec ── */
+int execvp(const char *file, char *const argv[]) {
+    static int (*real_execvp)(const char *, char *const *) = NULL;
+    if (!real_execvp) real_execvp = dlsym(RTLD_NEXT, "execvp");
+    /* Temporarily unset LD_PRELOAD to prevent bionic children from
+     * inheriting our glibc hook.so */
+    char *old_preload = getenv("LD_PRELOAD");
+    if (old_preload) {
+        char *saved = strdup(old_preload);
+        unsetenv("LD_PRELOAD");
+        int ret = real_execvp(file, argv);
+        setenv("LD_PRELOAD", saved, 1);
+        free(saved);
+        return ret;
+    }
+    return real_execvp(file, argv);
 }
 
 /* ═══════════════════════════════════════════════

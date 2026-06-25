@@ -1,27 +1,14 @@
 /**
- * codebuff-wrapper.c — Codebuff for Termux launcher
+ * codebuff-wrapper.c — Codebuff for Termux launcher (proot-only approach)
  *
- * Bionic-compiled C wrapper (~5KB ELF) that:
- *   1. Cleans LD_* environment variables to prevent glibc ld.so pollution
- *   2. Detects proot(1) availability, sets up path redirections for /proc/stat
- *   3. LD_PRELOADs hook.so for supplementary glibc function interception
- *   4. Execs the codebuff binary (either under proot or directly)
- *
- * This wrapper does NOT depend on bash, zsh, node, or any rc files.
- * It uses only basic C runtime + standard POSIX syscalls.
+ * Uses proot to bind-mount fake CPU/proc files, avoiding LD_PRELOAD
+ * which doesn't work with Bun's direct syscalls.
  *
  * Build:
- *   gcc -O2 -s -o codebuff-wrapper codebuff-wrapper.c
- *
- * Install:
- *   install -m 755 codebuff-wrapper /usr/bin/codebuff
- *
- * The wrapper locates hook.so and the binary relative to its own
- * installation path:
- *   <prefix>/bin/codebuff         ← this wrapper
- *   <prefix>/lib/codebuff/hook.so ← LD_PRELOAD hook
- *   The codebuff binary path is configured at compile time or
- *   discovered via the installed npm package.
+ *   gcc -O2 -s -o codebuff-wrapper codebuff-wrapper.c \
+ *     -DCODEBUFF_BINARY='"/path/to/codebuff"' \
+ *     -DPROOT_PATH='"/usr/bin/proot"' \
+ *     -DFAKE_DIR='"/data/data/com.termux/files/usr/tmp/.codebuff-fake"'
  */
 #define _GNU_SOURCE
 #include <unistd.h>
@@ -30,45 +17,39 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <limits.h>
-#include <libgen.h>
 #include <errno.h>
 
-/* ── Default paths (overridable at build with -D) ─────────────────── */
 #ifndef CODEBUFF_BINARY
 #  define CODEBUFF_BINARY \
-    "/data/data/com.termux/files/home/.config/manicode/codebuff"
-#endif
-#ifndef HOOK_SO
-#  define HOOK_SO \
-    "/data/data/com.termux/files/home/develop/codebuff-termux/tools/hook.so"
+    "/data/data/com.termux/files/usr/lib/codebuff/runtime/codebuff"
 #endif
 #ifndef PROOT_PATH
 #  define PROOT_PATH \
     "/data/data/com.termux/files/usr/bin/proot"
 #endif
-#ifndef FAKE_STAT_PATH
-#  define FAKE_STAT_PATH \
-    "/data/data/com.termux/files/usr/tmp/.codebuff-proc-stat"
+#ifndef FAKE_DIR
+#  define FAKE_DIR \
+    "/data/data/com.termux/files/usr/tmp/.codebuff-fake"
 #endif
 
-/* ── Helpers ──────────────────────────────────────────────────────── */
-static void xunsetenv(const char *name) {
-    /* Ignore error if not set — that's fine */
-    (void)unsetenv(name);
-}
-
-static int exists(const char *path, int mode_mask) {
+static void ensure_dir(const char *dir) {
     struct stat st;
-    return (stat(path, &st) == 0 && (st.st_mode & S_IFMT) != S_IFDIR
-            && (mode_mask == 0 || (st.st_mode & mode_mask)));
+    if (stat(dir, &st) == -1) mkdir(dir, 0755);
 }
 
-static void create_fake_stat(const char *path) {
-    /* Write enough data for libuv's uv_cpu_info() to parse.
-     * 8 CPU cores with all-zero counters satisfies the parser
-     * while avoiding exposing real CPU data (which is restricted
-     * on Android 11+). */
-    const char *content =
+static void write_file(const char *path, const char *content) {
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fwrite(content, 1, strlen(content), f);
+    fclose(f);
+    chmod(path, 0644);
+}
+
+static void create_fake_files(void) {
+    ensure_dir(FAKE_DIR);
+
+    /* /proc/stat — 8 CPU cores */
+    write_file(FAKE_DIR "/stat",
         "cpu  0 0 0 0 0 0 0 0 0 0\n"
         "cpu0 0 0 0 0 0 0 0 0 0 0\n"
         "cpu1 0 0 0 0 0 0 0 0 0 0\n"
@@ -78,31 +59,44 @@ static void create_fake_stat(const char *path) {
         "cpu5 0 0 0 0 0 0 0 0 0 0\n"
         "cpu6 0 0 0 0 0 0 0 0 0 0\n"
         "cpu7 0 0 0 0 0 0 0 0 0 0\n"
-        "intr 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
-        " 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n"
-        "ctxt 0\n"
-        "btime 0\n"
-        "processes 0\n"
-        "procs_running 1\n"
-        "procs_blocked 0\n"
-        "softirq 0 0 0 0 0 0 0 0 0 0\n";
+        "intr 0 0 0 0 0 0 0 0 0 0\n"
+        "ctxt 0\nbtime 0\nprocesses 0\n"
+        "procs_running 1\nprocs_blocked 0\n"
+        "softirq 0 0 0 0 0 0 0 0 0 0\n");
 
-    FILE *f = fopen(path, "w");
-    if (!f) return;
-    fwrite(content, 1, strlen(content), f);
-    fclose(f);
-    chmod(path, 0644);
+    /* /proc/cpuinfo — 8 ARM cores */
+    {
+        FILE *f = fopen(FAKE_DIR "/cpuinfo", "w");
+        if (f) {
+            for (int i = 0; i < 8; i++)
+                fprintf(f,
+                    "processor\t: %d\n"
+                    "BogoMIPS\t: 100.00\n"
+                    "Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32\n"
+                    "CPU implementer\t: 0x41\n"
+                    "CPU architecture\t: 8\n"
+                    "CPU variant\t: 0x0\n"
+                    "CPU part\t: 0xd0d\n"
+                    "CPU revision\t: 2\n\n", i);
+            fclose(f);
+            chmod(FAKE_DIR "/cpuinfo", 0644);
+        }
+    }
+
+    /* /sys/devices/system/cpu/present */
+    write_file(FAKE_DIR "/cpu-present", "0-7\n");
+    /* /sys/devices/system/cpu/online */
+    write_file(FAKE_DIR "/cpu-online", "0-7\n");
+    /* /proc/loadavg */
+    write_file(FAKE_DIR "/loadavg", "0.00 0.00 0.00 1/1 1\n");
 }
 
-/* ── argv builder ─────────────────────────────────────────────────── */
-typedef struct {
-    char **argv;
-    int cap, len;
-} Argv;
+/* ── argv builder ── */
+typedef struct { char **argv; int cap, len; } Argv;
 
 static Argv *argv_new(int hint) {
     Argv *a = malloc(sizeof(Argv));
-    a->cap = hint ? hint : 16;
+    a->cap = hint ? hint : 32;
     a->len = 0;
     a->argv = malloc(a->cap * sizeof(char *));
     return a;
@@ -116,97 +110,73 @@ static void argv_add(Argv *a, const char *s) {
     a->argv[a->len++] = strdup(s);
 }
 
-static void argv_emit(Argv *a) {
-    a->argv[a->len] = NULL;
+static void argv_emit(Argv *a) { a->argv[a->len] = NULL; }
+
+static void xunsetenv(const char *name) {
+    (void)unsetenv(name);
 }
 
-/* ── Main ─────────────────────────────────────────────────────────── */
-int main(int argc, char *argv[], char *envp[]) {
-    /* 1. Strip LD_* variables that would poison glibc ld.so */
-    xunsetenv("LD_LIBRARY_PATH");
+int main(int argc, char *argv[]) {
+    /* Strip LD_* env vars that could poison glibc loading */
     xunsetenv("LD_PRELOAD");
+    xunsetenv("LD_LIBRARY_PATH");
     xunsetenv("LD_DEBUG");
-    xunsetenv("LD_BIND_NOW");
-    xunsetenv("LD_ORIGIN_PATH");
-    xunsetenv("LD_RUN_PATH");
-    xunsetenv("GLIBC_LD_LIBRARY_PATH");
 
-    /* 2. Check if user explicitly wants to skip proot */
-    int use_proot = 1;
-    int user_argc = argc;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--no-proot") == 0) {
-            use_proot = 0;
-            user_argc--;
-        }
-    }
+    /* Check proot availability */
+    struct stat st;
+    int has_proot = (stat(PROOT_PATH, &st) == 0 && (st.st_mode & S_IXUSR));
 
-    /* 3. Check proot availability */
-    int has_proot = use_proot && exists(PROOT_PATH, X_OK);
-
-    /* 4. Check hook.so and binary availability */
-    int has_hook = exists(HOOK_SO, R_OK);
-    int has_binary = exists(CODEBUFF_BINARY, X_OK);
-
-    if (!has_binary) {
-        fprintf(stderr, "codebuff-wrapper: binary not found at %s\n"
-                "Run 'codebuff --version' to trigger download, or\n"
-                "reinstall via: bash <(curl -sL https://...) install.sh\n",
-                CODEBUFF_BINARY);
+    if (!has_proot) {
+        /* No proot: just exec directly (will likely fail on CPU info) */
+        fprintf(stderr, "codebuff: proot not found at %s, "
+                "running without CPU fakes\n", PROOT_PATH);
+        argv[0] = (char *)CODEBUFF_BINARY;
+        execvp(CODEBUFF_BINARY, argv);
+        fprintf(stderr, "codebuff: exec failed: %m\n");
         return 1;
     }
 
-    /* 5. Build argv */
-    Argv *cmd = argv_new(4 + user_argc);
+    /* Create fake files */
+    create_fake_files();
 
-    if (has_proot) {
-        /* Create fake /proc/stat for os.cpus() */
-        create_fake_stat(FAKE_STAT_PATH);
+    /* Build proot command with all bind mounts */
+    Argv *cmd = argv_new(4 + argc);
+    argv_add(cmd, PROOT_PATH);
 
-        cmd->argv[cmd->len++] = (char *)PROOT_PATH;
-        cmd->argv[cmd->len++] = "-b";
-        char bind_arg[512];
-        snprintf(bind_arg, sizeof(bind_arg), "%s:/proc/stat",
-                 FAKE_STAT_PATH);
-        cmd->argv[cmd->len++] = strdup(bind_arg);
+    /* Bind mount all fake files */
+    {
+        char bind[512];
+        snprintf(bind, sizeof(bind), FAKE_DIR "/stat:/proc/stat");
+        argv_add(cmd, "-b"); argv_add(cmd, bind);
+
+        snprintf(bind, sizeof(bind), FAKE_DIR "/cpuinfo:/proc/cpuinfo");
+        argv_add(cmd, "-b"); argv_add(cmd, bind);
+
+        snprintf(bind, sizeof(bind), FAKE_DIR "/loadavg:/proc/loadavg");
+        argv_add(cmd, "-b"); argv_add(cmd, bind);
+
+        snprintf(bind, sizeof(bind),
+                 FAKE_DIR "/cpu-present:/sys/devices/system/cpu/present");
+        argv_add(cmd, "-b"); argv_add(cmd, bind);
+
+        snprintf(bind, sizeof(bind),
+                 FAKE_DIR "/cpu-online:/sys/devices/system/cpu/online");
+        argv_add(cmd, "-b"); argv_add(cmd, bind);
     }
 
-    /* 6. Set LD_PRELOAD for hook.so (setenv before exec, but after
-     *    unsetenv above — we selectively re-introduce our own hook).
-     *    This is done via env manipulation in exec, not via argv. */
-    if (has_hook) {
-        setenv("LD_PRELOAD", HOOK_SO, 1);
-    }
-
-    /* 7. Append binary + original args (skip --no-proot) */
-    cmd->argv[cmd->len++] = (char *)CODEBUFF_BINARY;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--no-proot") != 0)
-            cmd->argv[cmd->len++] = argv[i];
-    }
+    /* Append codebuff binary + args */
+    argv_add(cmd, CODEBUFF_BINARY);
+    for (int i = 1; i < argc; i++)
+        argv_add(cmd, argv[i]);
     argv_emit(cmd);
 
-    /* 8. Exec */
-    execvp(cmd->argv[0], cmd->argv);
+    /* Exec under proot */
+    execvp(PROOT_PATH, cmd->argv);
 
-    /* 9. Fallback: exec without proot */
-    if (has_proot) {
-        fprintf(stderr, "codebuff-wrapper: proot exec failed (%m), "
-                "falling back to direct exec\n");
-    }
-
-    /* Build direct execve call */
-    char **fb = malloc((user_argc + 1) * sizeof(char *));
-    fb[0] = (char *)CODEBUFF_BINARY;
-    int fi = 1;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--no-proot") != 0)
-            fb[fi++] = argv[i];
-    }
-    fb[fi] = NULL;
-
-    execve(CODEBUFF_BINARY, fb, environ);
-    fprintf(stderr, "codebuff-wrapper: execve %s failed: %m\n",
-            CODEBUFF_BINARY);
+    /* Fallback: direct exec */
+    fprintf(stderr, "codebuff: proot exec failed (%m), falling back\n");
+    argv[0] = (char *)CODEBUFF_BINARY;
+    execvp(CODEBUFF_BINARY, argv);
+    fprintf(stderr, "codebuff: exec failed: %m\n");
     return 1;
 }
